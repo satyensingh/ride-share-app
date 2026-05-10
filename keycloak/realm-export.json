@@ -1,0 +1,108 @@
+{
+  "realm": "ride-share",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "attributes": {
+    "frontendUrl": "http://localhost:8081"
+  },
+  "roles": {
+    "realm": [
+      {
+        "name": "car_owner",
+        "description": "Can publish rides"
+      },
+      {
+        "name": "passenger",
+        "description": "Can use passenger features"
+      },
+      {
+        "name": "admin",
+        "description": "Can administer ride-share APIs"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ride-share-api",
+      "name": "Ride Share API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "owner1",
+      "enabled": true,
+      "email": "owner1@example.com",
+      "firstName": "Owner",
+      "lastName": "One",
+      "emailVerified": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "car_owner"
+      ]
+    },
+    {
+      "username": "passenger1",
+      "enabled": true,
+      "email": "passenger1@example.com",
+      "firstName": "Passenger",
+      "lastName": "One",
+      "emailVerified": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "passenger"
+      ]
+    },
+    {
+      "username": "admin1",
+      "enabled": true,
+      "email": "admin1@example.com",
+      "firstName": "Admin",
+      "lastName": "One",
+      "emailVerified": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin"
+      ]
+    }
+  ]
+}

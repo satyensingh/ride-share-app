@@ -11,12 +11,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -26,9 +30,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.mockito.Mockito.when;
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -54,6 +60,9 @@ class RideApiIntegrationTest {
     @Autowired
     private RideRepository rideRepository;
 
+    @MockBean
+    private JwtDecoder jwtDecoder;
+
     @BeforeEach
     void cleanDatabase() {
         rideRepository.deleteAll();
@@ -61,6 +70,8 @@ class RideApiIntegrationTest {
 
     @Test
     void publishRideShouldPersistRideAndReturnCreatedResponse() {
+        when(jwtDecoder.decode("owner-token")).thenReturn(jwt("owner-token", "owner1", "car_owner"));
+
         PublishRideRequest request = new PublishRideRequest(
                 "  Navi Mumbai  ",
                 "  Pune  ",
@@ -72,7 +83,7 @@ class RideApiIntegrationTest {
 
         ResponseEntity<PublishRideResponse> response = restTemplate.postForEntity(
                 "/api/v1/ride/publish",
-                request,
+                authorizedJsonRequest(request, "owner-token"),
                 PublishRideResponse.class
         );
 
@@ -116,7 +127,30 @@ class RideApiIntegrationTest {
     }
 
     @Test
+    void publishRideShouldAllowAdminRole() {
+        when(jwtDecoder.decode("admin-token")).thenReturn(jwt("admin-token", "admin1", "admin"));
+
+        ResponseEntity<PublishRideResponse> response = restTemplate.postForEntity(
+                "/api/v1/ride/publish",
+                authorizedJsonRequest(validPublishRideRequest(), "admin-token"),
+                PublishRideResponse.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        PublishRideResponse body = response.getBody();
+        assertThat(body).isNotNull();
+
+        assertAll(
+                () -> assertThat(body.rideId()).isNotNull(),
+                () -> assertThat(body.status()).isEqualTo("PUBLISHED"),
+                () -> assertThat(rideRepository.findAll()).hasSize(1)
+        );
+    }
+
+    @Test
     void publishRideShouldReturnBadRequestAndNotPersistInvalidPayload() {
+        when(jwtDecoder.decode("owner-token")).thenReturn(jwt("owner-token", "owner1", "car_owner"));
+
         String invalidPayload = """
                 {
                   "source": "",
@@ -132,13 +166,9 @@ class RideApiIntegrationTest {
                 }
                 """;
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<String> request = new HttpEntity<>(invalidPayload, headers);
-
         ResponseEntity<ApiErrorResponse> response = restTemplate.postForEntity(
                 "/api/v1/ride/publish",
-                request,
+                authorizedJsonRequest(invalidPayload, "owner-token"),
                 ApiErrorResponse.class
         );
 
@@ -159,5 +189,84 @@ class RideApiIntegrationTest {
                 )
         );
         assertThat(rideRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void publishRideShouldReturnUnauthorizedWithoutBearerToken() {
+        PublishRideRequest request = validPublishRideRequest();
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                "/api/v1/ride/publish",
+                request,
+                String.class
+        );
+
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(rideRepository.findAll()).isEmpty()
+        );
+    }
+
+    @Test
+    void publishRideShouldReturnUnauthorizedForInvalidBearerToken() {
+        when(jwtDecoder.decode("invalid-token")).thenThrow(new JwtException("Invalid token"));
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                "/api/v1/ride/publish",
+                authorizedJsonRequest(validPublishRideRequest(), "invalid-token"),
+                String.class
+        );
+
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED),
+                () -> assertThat(rideRepository.findAll()).isEmpty()
+        );
+    }
+
+    @Test
+    void publishRideShouldReturnForbiddenForPassengerRole() {
+        when(jwtDecoder.decode("passenger-token")).thenReturn(jwt("passenger-token", "passenger1", "passenger"));
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+                "/api/v1/ride/publish",
+                authorizedJsonRequest(validPublishRideRequest(), "passenger-token"),
+                String.class
+        );
+
+        assertAll(
+                () -> assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN),
+                () -> assertThat(rideRepository.findAll()).isEmpty()
+        );
+    }
+
+    private PublishRideRequest validPublishRideRequest() {
+        return new PublishRideRequest(
+                "Navi Mumbai",
+                "Pune",
+                Instant.parse("2026-06-15T09:30:00Z"),
+                3,
+                BigDecimal.valueOf(450.00),
+                new CarDetailsRequest("Maruti Suzuki", "Ertiga", "MH46AB1234", "White")
+        );
+    }
+
+    private <T> HttpEntity<T> authorizedJsonRequest(T body, String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(token);
+        return new HttpEntity<>(body, headers);
+    }
+
+    private Jwt jwt(String tokenValue, String subject, String role) {
+        Instant issuedAt = Instant.parse("2026-05-10T10:00:00Z");
+        return Jwt.withTokenValue(tokenValue)
+                .header("alg", "RS256")
+                .issuer("http://localhost:8081/realms/ride-share")
+                .subject(subject)
+                .issuedAt(issuedAt)
+                .expiresAt(issuedAt.plusSeconds(3600))
+                .claim("preferred_username", subject)
+                .claim("realm_access", Map.of("roles", List.of(role)))
+                .build();
     }
 }

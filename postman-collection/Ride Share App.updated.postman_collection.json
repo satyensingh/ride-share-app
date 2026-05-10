@@ -1,0 +1,146 @@
+{
+  "info": {
+    "_postman_id": "393f4bcc-5ae4-488f-aad8-abcf5b7d8db2",
+    "name": "Ride Share App",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "44179023"
+  },
+  "item": [
+    {
+      "name": "Publish Ride",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"source\": \"Navi Mumbai\",\n  \"destination\": \"Pune\",\n  \"departureTime\": \"2026-06-15T09:30:00Z\",\n  \"numberOfSeats\": 3,\n  \"pricePerSeat\": 450.00,\n  \"carDetails\": {\n    \"make\": \"Maruti Suzuki\",\n    \"model\": \"Ertiga\",\n    \"number\": \"MH46AB1234\",\n    \"color\": \"White\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ride/publish",
+          "protocol": "http",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "port": "8080",
+          "path": [
+            "api",
+            "v1",
+            "ride",
+            "publish"
+          ]
+        },
+        "description": "Generated from cURL: curl --location 'http://localhost:8080/api/v1/ride/publish' \\\n--header 'Content-Type: application/json' \\\n--data '{\n  \"source\": \"Navi Mumbai\",\n  \"destination\": \"Pune\",\n  \"departureTime\": \"2026-06-15T09:30:00Z\",\n  \"numberOfSeats\": 3,\n  \"pricePerSeat\": 450.00,\n  \"carDetails\": {\n    \"make\": \"Maruti Suzuki\",\n    \"model\": \"Ertiga\",\n    \"number\": \"MH46AB1234\",\n    \"color\": \"White\"\n  }\n}'"
+      },
+      "response": []
+    },
+    {
+      "name": "Generate Auth Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "client_id",
+              "value": "ride-share-api",
+              "type": "text"
+            },
+            {
+              "key": "grant_type",
+              "value": "password",
+              "type": "text"
+            },
+            {
+              "key": "username",
+              "value": "owner1",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "password",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{keycloakUrl}}/realms/ride-share/protocol/openid-connect/token",
+          "protocol": "http",
+          "host": [
+            "{{keycloakUrl}}"
+          ],
+          "port": "8081",
+          "path": [
+            "realms",
+            "ride-share",
+            "protocol",
+            "openid-connect",
+            "token"
+          ]
+        },
+        "description": "Generated from cURL: curl --location 'http://localhost:8081/realms/ride-share/protocol/openid-connect/token' \\\n  --header 'Content-Type: application/x-www-form-urlencoded' \\\n  --data-urlencode 'client_id=ride-share-api' \\\n  --data-urlencode 'grant_type=password' \\\n  --data-urlencode 'username=owner1' \\\n  --data-urlencode 'password=password'"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Token generated successfully\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "if (jsonData.access_token) {",
+              "    pm.collectionVariables.set(\"accessToken\", jsonData.access_token);",
+              "}"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "keycloakUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    }
+  ]
+}

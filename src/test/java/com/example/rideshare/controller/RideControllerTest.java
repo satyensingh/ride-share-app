@@ -7,8 +7,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+
+import com.example.rideshare.config.SecurityConfig;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -19,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RideController.class)
+@Import(SecurityConfig.class)
 class RideControllerTest {
 
     @Autowired
@@ -30,7 +36,11 @@ class RideControllerTest {
     @MockBean
     private RideService rideService;
 
+    @MockBean
+    private JwtDecoder jwtDecoder;
+
     @Test
+    @WithMockUser(roles = "CAR_OWNER")
     void publishRideShouldReturnCreated() throws Exception {
         PublishRideRequest request = new PublishRideRequest(
                 "Navi Mumbai",
@@ -68,6 +78,7 @@ class RideControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "CAR_OWNER")
     void publishRideShouldReturnBadRequestForInvalidPayload() throws Exception {
         String invalidPayload = """
                 {
@@ -89,5 +100,31 @@ class RideControllerTest {
                         .content(invalidPayload))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Validation failed"));
+    }
+
+    @Test
+    void publishRideShouldReturnUnauthorizedWithoutToken() throws Exception {
+        mockMvc.perform(post("/api/v1/ride/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "PASSENGER")
+    void publishRideShouldReturnForbiddenForPassengerRole() throws Exception {
+        PublishRideRequest request = new PublishRideRequest(
+                "Navi Mumbai",
+                "Pune",
+                Instant.parse("2026-06-15T09:30:00Z"),
+                3,
+                BigDecimal.valueOf(450.00),
+                new CarDetailsRequest("Maruti Suzuki", "Ertiga", "MH46AB1234", "White")
+        );
+
+        mockMvc.perform(post("/api/v1/ride/publish")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
     }
 }
